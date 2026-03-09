@@ -1,13 +1,12 @@
 use pyo3::prelude::*;
 
-/// A Python module implemented in Rust.
+mod path;
+
+/// Provides support for opening and reading Petroglyph MEGA files in Python.
 #[pymodule]
-mod petro_meg_py {
+mod petro_meg {
     use pyo3::prelude::*;
 
-    /// Formats the sum of two numbers as string.
-    #[pyfunction]
-    fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-        Ok((a + b).to_string())
-    }
+    #[pymodule_export]
+    use crate::path::PyMegPath;
 }
