@@ -1,13 +1,14 @@
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
+use petro_meg::path::{MegPath, MegPathBuf, MegPathError};
+use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-
-use petro_meg::path::{MegPath, MegPathBuf, MegPathError};
 use pyo3::types::{PyString, PyStringMethods};
 
 /// A case-insensitive, ASCII-only relative path used for Petroglyph MEGA files.
-#[pyclass(eq, hash, frozen, module = "petro_meg", name = "MegPath")]
+#[pyclass(frozen, module = "petro_meg", name = "MegPath")]
 #[derive(PartialEq, Eq, Hash)]
 pub(crate) struct PyMegPath {
     path: MegPathBuf,
@@ -47,12 +48,28 @@ impl PyMegPath {
         }
     }
 
+    fn __richcmp__(&self, other: BorrowMegPath, op: CompareOp) -> bool {
+        op.matches((*self.path).cmp(other.0))
+    }
+
+    fn __hash__(&self) -> u64 {
+        let mut hasher = std::hash::DefaultHasher::new();
+        self.path.hash(&mut hasher);
+        hasher.finish()
+    }
+
     fn __repr__(&self) -> String {
         format!("MegPath({:?})", self.path)
     }
 
     fn __str__(&self) -> String {
         self.path.to_string()
+    }
+}
+
+impl From<MegPathBuf> for PyMegPath {
+    fn from(path: MegPathBuf) -> Self {
+        PyMegPath { path }
     }
 }
 
