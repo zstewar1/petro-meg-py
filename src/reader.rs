@@ -1,15 +1,16 @@
-use std::io::{self, Read, Seek};
+use std::io::Read;
 use std::sync::{Arc, OnceLock};
 
 use petro_meg::crypto::Key;
 use petro_meg::reader::{FileEntry, MegReadError, MegReadOptions, ReadMegMeta};
-use petro_meg::version::MegVersion;
 use pyo3::exceptions::{PyIOError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::sync::OnceLockExt;
 use pyo3::{PyTraverseError, PyVisit};
 
+use crate::io::AnyAsRead;
 use crate::path::PyMegPath;
+use crate::version::VersionArg;
 
 /// Gets a list of files from the given MEGA file.
 #[pyfunction]
@@ -21,11 +22,9 @@ pub(crate) fn read_meg(
     iv: Option<&[u8]>,
 ) -> PyResult<Vec<PyFileEntry>> {
     let version = version.map(|v| v.version);
-    let mut read = AnyAsRead {
-        py_read: &mega_file,
-    };
+    let mut read = AnyAsRead::new(&mega_file);
     let key = match (key, iv) {
-        (Some(k), Some(i)) if k.len() == 16 && k.len() == 16 => {
+        (Some(k), Some(i)) if k.len() == 16 && i.len() == 16 => {
             let mut key = [0u8; 16];
             key.copy_from_slice(k);
             let mut iv = [0u8; 16];
@@ -37,7 +36,7 @@ pub(crate) fn read_meg(
         }
         (None, Some(_)) | (Some(_), None) => {
             return Err(PyTypeError::new_err(
-                "Key and IV must either both be specified or both None",
+                "Key and IV must either both be specified or both be None",
             ));
         }
         (None, None) => None,
@@ -99,7 +98,7 @@ impl PyFileEntry {
             return Err(PyIOError::new_err("Already disposed"));
         };
         let py_read = mega_file.bind(py);
-        let reader = AnyAsRead { py_read };
+        let reader = AnyAsRead::new(py_read);
         let mut reader = self.entry.extract_from(reader, &self.options)?;
 
         let mut res = Vec::with_capacity(self.entry.size() as usize);
@@ -114,78 +113,5 @@ impl PyFileEntry {
 
     fn __clear__(&mut self) {
         self.mega_file = None;
-    }
-}
-
-/// Implements Read on a python object that implements io.RawIOBase or io.BufferedIOBase.
-struct AnyAsRead<'a, 'py> {
-    py_read: &'a Bound<'py, PyAny>,
-}
-
-impl<'a, 'py> Read for AnyAsRead<'a, 'py> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let read = self.py_read.call_method1("read1", (buf.len(),))?;
-        let data = read.extract::<&[u8]>().map_err(|e| PyErr::from(e))?;
-        if data.len() > buf.len() {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Underlying python File returned more bytes than requested",
-            ))
-        } else {
-            buf[..data.len()].copy_from_slice(data);
-            Ok(data.len())
-        }
-    }
-}
-
-impl<'a, 'py> Seek for AnyAsRead<'a, 'py> {
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        let res = match pos {
-            io::SeekFrom::Start(offset) => self.py_read.call_method("seek", (offset, 0), None)?,
-            io::SeekFrom::Current(offset) => self.py_read.call_method("seek", (offset, 1), None)?,
-            io::SeekFrom::End(offset) => self.py_read.call_method("seek", (offset, 2), None)?,
-        };
-        Ok(res.extract()?)
-    }
-}
-
-/// Extract type for reader version arg.
-pub(crate) struct VersionArg {
-    version: MegVersion,
-}
-
-impl<'a, 'py> FromPyObject<'a, 'py> for VersionArg {
-    type Error = PyErr;
-
-    fn extract(obj: Borrowed<'a, 'py, PyAny>) -> Result<Self, Self::Error> {
-        let version = if let Ok(v) = obj.extract::<u64>() {
-            match v {
-                1 => MegVersion::V1,
-                2 => MegVersion::V2,
-                3 => MegVersion::V3,
-                _ => {
-                    return Err(PyValueError::new_err(format!(
-                        "Version must be 1, 2, or 3, got {v}"
-                    )));
-                }
-            }
-        } else if let Ok(v) = obj.extract::<&str>() {
-            match v {
-                "v1" | "V1" | "1" => MegVersion::V1,
-                "v2" | "V2" | "2" => MegVersion::V2,
-                "v3" | "V3" | "3" => MegVersion::V3,
-                _ => {
-                    return Err(PyValueError::new_err(format!(
-                        "Version must be 1, 2, or 3, got {v}"
-                    )));
-                }
-            }
-        } else {
-            return Err(PyTypeError::new_err(format!(
-                "Version must be int, or str, got {}",
-                obj.get_type(),
-            )));
-        };
-        Ok(VersionArg { version })
     }
 }
