@@ -1,7 +1,7 @@
 use petro_meg::crypto::Key;
 use petro_meg::writer::{AnyVersionSettings, BuildMeg, MegBuilder};
 use pyo3::exceptions::{PyIOError, PyValueError};
-use pyo3::prelude::*;
+use pyo3::{prelude::*, PyTraverseError, PyVisit};
 
 use crate::io::{AnyAsRead, AnyAsWrite};
 use crate::path::BorrowMegPath;
@@ -53,5 +53,14 @@ impl PyMegBuilder {
             .build(&mut out)
             .map_err(|e| PyIOError::new_err(format!("Failed to build MEGA file: {e}")))?;
         Ok(())
+    }
+
+    fn __traverse__(&self, visit: PyVisit) -> Result<(), PyTraverseError> {
+        self.inner.files().map(|val| visit.call(val.inner())).collect()
+    }
+
+    fn __clear__(&mut self) {
+        let new = self.inner.version().builder();
+        self.inner = new;
     }
 }

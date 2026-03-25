@@ -9,7 +9,7 @@ name = "petro_meg"
 crate-type = ["cdylib"]
 
 [dependencies]
-petro-meg = "1.0.2"
+petro-meg = "1.0.4"
 
 [dependencies.pyo3]
 version = "0.28.2"

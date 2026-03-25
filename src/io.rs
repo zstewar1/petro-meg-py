@@ -50,6 +50,11 @@ impl<A> AnyAsRead<A> {
     pub(crate) fn new(py_read: A) -> Self {
         Self { py_read }
     }
+
+    /// Gets a reference to the inner python object.
+    pub(crate) fn inner(&self) -> &A {
+        &self.py_read
+    }
 }
 
 impl<A: AnyHelper> Read for AnyAsRead<A> {

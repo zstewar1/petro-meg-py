@@ -6,11 +6,13 @@ from .petro_meg import MegPath, _MegBuilder
 class MegBuilder(object):
     """Builder for MEGA files."""
 
-    def __init__(self, version, /, key=None, iv=None, entries={}):
+    def __init__(self, version, /, key=None, iv=None, entries=None):
         """Create a MEGA file builder with the given version."""
-        self._entries = dict(entries)
+        self._entries = {}
         self.version = version
         self.set_encryption(key, iv)
+        if entries is not None:
+            self.update(entries)
 
     def set_encryption(self, key, iv=None):
         """Sets the Key and Initial Vector used for encryption or clears them.
@@ -18,18 +20,19 @@ class MegBuilder(object):
         For convenience this can be called with a single argument, `set_encryption(None)` to clear
         encryption. To enable encryption both Key and IV must be specified.
         """
-        if key is None and iv is None:
-            self._key = key
-            self._iv = iv
-        elif key is not None and iv is not None:
-            key = bytes(key)
-            iv = bytes(iv)
-            if len(key) != 16 or len(iv) != 16:
-                raise ValueError('Key and IV must both have len 16')
-            self._key = key
-            self._iv = iv
-        else:
-            raise TypeError('Key and IV must eith both be specified or both be None')
+        match key, iv:
+            case (None, None) | ((None, None), None):
+                self._key = None
+                self._iv = None
+            case ((key, iv), None) | (key, iv):
+                key = bytes(key)
+                iv = bytes(iv)
+                if len(key) != 16 or len(iv) != 16:
+                    raise ValueError('Key and IV must both have len 16')
+                self._key = key
+                self._iv = iv
+            case _:
+                raise TypeError('Key and IV must eith both be specified or both be None, or key must be a tuple containing both the Key and IV')
 
     def get_encryption(self):
         """Returns a tuple containing the current Key and IV used for encryption."""
@@ -53,11 +56,11 @@ class MegBuilder(object):
     def version(self, version):
         match version:
             case 1 | '1' | 'v1' | 'V1':
-                self._version = 1
+                self._version = 'V1'
             case 2 | '2' | 'v2' | 'V2':
-                self._version = 2
+                self._version = 'V2'
             case 3 | '3' | 'v3' | 'V3':
-                self._version = 3
+                self._version = 'V3'
             case _:
                 if not (isinstance(version, str) or isinstance(version, int)):
                     raise TypeError(f'Version must be int or str, got {type(version)}')
@@ -78,6 +81,16 @@ class MegBuilder(object):
         path = MegPath(path)
         self._entries[path] = value
 
+    def update(self, values=None, **kwargs):
+        """Updates several entries in the builder at once."""
+        if values is not None:
+            # Convert to dict once to handle e.g. lists of tuples.
+            values = dict(values)
+            # Then convert the keys to MegPaths.
+            self._entries.update({MegPath(k): v for k, v in values.items()})
+        self._entries.update({MegPath(k): v for k, v in values.items()})
+
+
     def __delitem__(self, path):
         """Deletes the entry with the given path."""
         path = MegPath(path)
@@ -91,6 +104,18 @@ class MegBuilder(object):
     def __iter__(self):
         """Gets an iterator over the files contained in this Builder."""
         return iter(self._entries)
+
+    def keys(self):
+        """Gets an iterator over the keys in the Builder."""
+        return self._entries.keys()
+
+    def values(self):
+        """Gets an iterator over the values in the Builder."""
+        return self._entries.values()
+
+    def items(self):
+        """Gets an iterator over the items in the Builder."""
+        return self._entries.items()
 
     def build(self, outfile=None):
         """Builds the MEGA file.
@@ -111,3 +136,9 @@ class MegBuilder(object):
             with io.BytesIO() as out:
                 native.build(out)
                 return out.getvalue()
+
+    def __repr__(self):
+        key_str = ''
+        if self._key is not None:
+            key_str = f', key={self._key!r}, iv={self._iv!r}'
+        return f'MegBuilder({self._version!r}{key_str}, entries={self._entries!r})'

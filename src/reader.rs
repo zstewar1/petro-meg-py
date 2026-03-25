@@ -92,6 +92,18 @@ impl PyFileEntry {
         self.entry.size()
     }
 
+    /// Gets the start of this file relative to the MEGA file.
+    #[getter]
+    fn start(&self) -> usize {
+        self.entry.range().start
+    }
+
+    /// Get the end of this file relative to the MEGA file.
+    #[getter]
+    fn end(&self) -> usize {
+        self.entry.range().end
+    }
+
     /// Reads the contents of the file. The original MEGA file must still be open.
     fn read(&self, py: Python<'_>) -> PyResult<Vec<u8>> {
         let Some(mega_file) = self.mega_file.as_ref() else {

@@ -121,9 +121,9 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "petro-meg"
-version = "1.0.2"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05e53bfa6c26b1bd15e0d860efe9fc3debc956d6c7506e66e73646a92bc7cc4c"
+checksum = "93382ce2b1f2a69f0c4c896466b02032fb93f78a2e80aa99608c1892534c48e7"
 dependencies = [
  "aes",
  "byteorder",
