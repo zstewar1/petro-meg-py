@@ -14,3 +14,8 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version"]
+readme = "README.md"
+license = "MIT"
+
+[project.urls]
+Repository = "https://github.com/zstewar1/petro-meg-py"
